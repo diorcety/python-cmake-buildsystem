@@ -1,0 +1,87 @@
+diff -urN a/Lib/distutils/ccompiler.py b/Lib/distutils/ccompiler.py
+--- a/Lib/distutils/ccompiler.py	2020-08-15 08:43:26.000000000 +0200
++++ b/Lib/distutils/ccompiler.py	2020-08-31 23:10:08.708631311 +0200
+@@ -967,6 +967,8 @@
+                                "Mingw32 port of GNU C Compiler for Win32"),
+                    'bcpp':    ('bcppcompiler', 'BCPPCompiler',
+                                "Borland C++ Compiler"),
++                   'clang-cl':('_msvccompiler', 'ClangMSVCCompiler',
++                               "clang-cl for Microsoft Visual C++"),
+                  }
+ 
+ def show_compilers():
+diff -urN a/Lib/distutils/_msvccompiler.py b/Lib/distutils/_msvccompiler.py
+--- a/Lib/distutils/_msvccompiler.py	2020-08-15 08:43:26.000000000 +0200
++++ b/Lib/distutils/_msvccompiler.py	2020-08-31 23:11:06.677601320 +0200
+@@ -179,6 +179,14 @@
+     'win-amd64' : 'x86_amd64',
+ }
+ 
++# A map keyed by get_platform() return values to value accepted by
++# clang as the triple.
++PLAT_TO_LLVM_TARGETS = {
++    'win32': 'i686',
++    'win-amd64': 'x86_64',
++    'win-arm64': 'aarch64',
++}
++
+ # A set containing the DLLs that are guaranteed to be available for
+ # all micro versions of this Python version. Known extension
+ # dependencies that are not in this set will be copied to the output
+@@ -216,11 +224,12 @@
+     exe_extension = '.exe'
+ 
+ 
+-    def __init__(self, verbose=0, dry_run=0, force=0):
++    def __init__(self, verbose=0, dry_run=0, force=0, use_clang_cl=False):
+         CCompiler.__init__ (self, verbose, dry_run, force)
+         # target platform (.plat_name is consistent with 'bdist')
+         self.plat_name = None
+         self.initialized = False
++        self.use_clang_cl = use_clang_cl
+ 
+     def initialize(self, plat_name=None):
+         # multi-init means we would need to check platform same each time...
+@@ -242,8 +251,12 @@
+ 
+         self._paths = vc_env.get('path', '')
+         paths = self._paths.split(os.pathsep)
+-        self.cc = _find_exe("cl.exe", paths)
+-        self.linker = _find_exe("link.exe", paths)
++        if self.use_clang_cl:
++            self.cc = _find_exe("clang-cl.exe")
++            self.linker = _find_exe("lld-link.exe")
++        else:
++            self.cc = _find_exe("cl.exe", paths)
++            self.linker = _find_exe("link.exe", paths)
+         self.lib = _find_exe("lib.exe", paths)
+         self.rc = _find_exe("rc.exe", paths)   # resource compiler
+         self.mc = _find_exe("mc.exe", paths)   # message compiler
+@@ -280,6 +293,16 @@
+         ldflags_debug = [
+             '/nologo', '/INCREMENTAL:NO', '/LTCG', '/DEBUG:FULL'
+         ]
++        if self.use_clang_cl:
++            # Add target for clang
++            target_flag = "--target={}-pc-windows-msvc".format(PLAT_TO_LLVM_TARGETS[plat_name])
++            self.compile_options.append(target_flag)
++            self.compile_options_debug.append(target_flag)
++            # Remove whole program optimization flags to avoid warnings about
++            # unrecognized options
++            self.compile_options.remove('/GL')
++            ldflags.remove('/LTCG')
++            ldflags_debug.remove('/LTCG')
+ 
+         self.ldflags_exe = [*ldflags, '/MANIFEST:EMBED,ID=1']
+         self.ldflags_exe_debug = [*ldflags_debug, '/MANIFEST:EMBED,ID=1']
+@@ -572,3 +595,10 @@
+         else:
+             # Oops, didn't find it in *any* of 'dirs'
+             return None
++
++
++class ClangMSVCCompiler(MSVCCompiler):
++    compiler_type = 'clang-cl'
++
++    def __init__(self, verbose=0, dry_run=0, force=0):
++        MSVCCompiler.__init__(self, verbose, dry_run, force, True)

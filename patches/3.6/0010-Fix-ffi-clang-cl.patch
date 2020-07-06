@@ -1,0 +1,21 @@
+diff -urN a/Modules/_ctypes/libffi_msvc/prep_cif.c b/Modules/_ctypes/libffi_msvc/prep_cif.c
+--- a/Modules/_ctypes/libffi_msvc/prep_cif.c	2018-10-20 07:24:09.000000000 +0200
++++ b/Modules/_ctypes/libffi_msvc/prep_cif.c	2020-07-26 01:15:48.180203735 +0200
+@@ -113,7 +113,7 @@
+   FFI_ASSERT_VALID_TYPE(cif->rtype);
+ 
+   /* x86-64 and s390 stack space allocation is handled in prep_machdep.  */
+-#if !defined M68K && !defined __x86_64__ && !defined S390
++#if !defined M68K && !defined S390
+   /* Make space for the return structure pointer */
+   if (cif->rtype->type == FFI_TYPE_STRUCT
+ #ifdef _WIN32
+@@ -138,7 +138,7 @@
+ 	 check after the initialization.  */
+       FFI_ASSERT_VALID_TYPE(*ptr);
+ 
+-#if !defined __x86_64__ && !defined S390
++#if !defined S390
+ #ifdef SPARC
+       if (((*ptr)->type == FFI_TYPE_STRUCT
+ 	   && ((*ptr)->size > 16 || cif->abi != FFI_V9))

@@ -1,0 +1,12 @@
+diff -urN a/Lib/distutils/ccompiler.py b/Lib/distutils/ccompiler.py
+--- a/Lib/distutils/ccompiler.py	2020-07-24 12:15:52.858017188 +0200
++++ b/Lib/distutils/ccompiler.py	2020-07-24 22:55:16.669313703 +0200
+@@ -929,7 +929,7 @@
+ 
+     # OS name mappings
+     ('posix', 'unix'),
+-    ('nt', 'msvc'),
++    ('nt', 'clang-cl'),
+ 
+     )
+ 

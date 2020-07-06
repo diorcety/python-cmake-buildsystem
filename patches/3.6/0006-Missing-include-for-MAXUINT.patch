@@ -1,0 +1,14 @@
+diff -urN a/PC/external/include/Setup.Configuration.h b/PC/external/include/Setup.Configuration.h
+--- a/PC/external/include/Setup.Configuration.h	2018-10-20 07:24:09.000000000 +0200
++++ b/PC/external/include/Setup.Configuration.h	2020-07-07 11:38:36.232518093 +0200
+@@ -22,6 +22,10 @@
+ 
+ #pragma once
+ 
++#ifndef MAXUINT
++#define MAXUINT     ((UINT)~((UINT)0))
++#endif
++
+ // Constants
+ //
+ #ifndef E_NOTFOUND
