@@ -1,0 +1,285 @@
+diff -urN a/Lib/distutils/command/build_ext.py b/Lib/distutils/command/build_ext.py
+--- a/Lib/distutils/command/build_ext.py	2018-10-20 07:24:09.000000000 +0200
++++ b/Lib/distutils/command/build_ext.py	2020-07-20 12:28:38.955288997 +0200
+@@ -189,9 +189,9 @@
+             # the 'libs' directory is for binary installs - we assume that
+             # must be the *native* platform.  But we don't really support
+             # cross-compiling via a binary install anyway, so we let it go.
+-            self.library_dirs.append(os.path.join(sys.exec_prefix, 'libs'))
++            self.library_dirs.append(os.path.join(sys.exec_prefix, 'lib'))
+             if sys.base_exec_prefix != sys.prefix:  # Issue 16116
+-                self.library_dirs.append(os.path.join(sys.base_exec_prefix, 'libs'))
++                self.library_dirs.append(os.path.join(sys.base_exec_prefix, 'lib'))
+             if self.debug:
+                 self.build_temp = os.path.join(self.build_temp, "Debug")
+             else:
+diff -urN a/Lib/distutils/command/install.py b/Lib/distutils/command/install.py
+--- a/Lib/distutils/command/install.py	2018-10-20 07:24:09.000000000 +0200
++++ b/Lib/distutils/command/install.py	2020-07-20 13:59:30.895898619 +0200
+@@ -20,17 +20,17 @@
+ HAS_USER_SITE = True
+ 
+ WINDOWS_SCHEME = {
+-    'purelib': '$base/Lib/site-packages',
+-    'platlib': '$base/Lib/site-packages',
+-    'headers': '$base/Include/$dist_name',
+-    'scripts': '$base/Scripts',
++    'purelib': '$base/lib/python/site-packages',
++    'platlib': '$base/lib/python/site-packages',
++    'headers': '$base/include/python$py_version_short/$dist_name',
++    'scripts': '$base/bin',
+     'data'   : '$base',
+ }
+ 
+ INSTALL_SCHEMES = {
+     'unix_prefix': {
+-        'purelib': '$base/lib/python$py_version_short/site-packages',
+-        'platlib': '$platbase/lib/python$py_version_short/site-packages',
++        'purelib': '$base/lib/python/site-packages',
++        'platlib': '$platbase/lib/python/site-packages',
+         'headers': '$base/include/python$py_version_short$abiflags/$dist_name',
+         'scripts': '$base/bin',
+         'data'   : '$base',
+@@ -50,8 +50,9 @@
+     INSTALL_SCHEMES['nt_user'] = {
+         'purelib': '$usersite',
+         'platlib': '$usersite',
+-        'headers': '$userbase/Python$py_version_nodot/Include/$dist_name',
+-        'scripts': '$userbase/Python$py_version_nodot/Scripts',
++        'headers':
++            '$userbase/include/python$py_version_short$abiflags/$dist_name',
++        'scripts': '$userbase/bin',
+         'data'   : '$userbase',
+         }
+ 
+diff -urN a/Lib/distutils/sysconfig.py b/Lib/distutils/sysconfig.py
+--- a/Lib/distutils/sysconfig.py	2018-10-20 07:24:09.000000000 +0200
++++ b/Lib/distutils/sysconfig.py	2020-07-20 12:27:52.936290992 +0200
+@@ -101,7 +101,8 @@
+         python_dir = 'python' + get_python_version() + build_flags
+         return os.path.join(prefix, "include", python_dir)
+     elif os.name == "nt":
+-        return os.path.join(prefix, "include")
++        python_dir = 'python' + get_python_version() + build_flags
++        return os.path.join(prefix, "include", python_dir)
+     else:
+         raise DistutilsPlatformError(
+             "I don't know where Python installs its C header files "
+diff -urN a/Lib/site.py b/Lib/site.py
+--- a/Lib/site.py	2018-10-20 07:24:09.000000000 +0200
++++ b/Lib/site.py	2020-07-20 12:27:52.936290992 +0200
+@@ -304,12 +304,10 @@
+         seen.add(prefix)
+ 
+         if os.sep == '/':
+-            sitepackages.append(os.path.join(prefix, "lib",
+-                                        "python%d.%d" % sys.version_info[:2],
+-                                        "site-packages"))
++            sitepackages.append(os.path.join(prefix, "lib", "python", "site-packages"))
+         else:
+             sitepackages.append(prefix)
+-            sitepackages.append(os.path.join(prefix, "lib", "site-packages"))
++            sitepackages.append(os.path.join(prefix, "lib", "python", "site-packages"))
+         if sys.platform == "darwin":
+             # for framework builds *only* we add the standard Apple
+             # locations.
+diff -urN a/Lib/sysconfig.py b/Lib/sysconfig.py
+--- a/Lib/sysconfig.py	2018-10-20 07:24:09.000000000 +0200
++++ b/Lib/sysconfig.py	2020-07-20 13:57:49.781366609 +0200
+@@ -20,14 +20,12 @@
+ 
+ _INSTALL_SCHEMES = {
+     'posix_prefix': {
+-        'stdlib': '{installed_base}/lib/python{py_version_short}',
+-        'platstdlib': '{platbase}/lib/python{py_version_short}',
+-        'purelib': '{base}/lib/python{py_version_short}/site-packages',
+-        'platlib': '{platbase}/lib/python{py_version_short}/site-packages',
+-        'include':
+-            '{installed_base}/include/python{py_version_short}{abiflags}',
+-        'platinclude':
+-            '{installed_platbase}/include/python{py_version_short}{abiflags}',
++        'stdlib': '{installed_base}/lib/python',
++        'platstdlib': '{platbase}/lib/python',
++        'purelib': '{base}/lib/python/site-packages',
++        'platlib': '{platbase}/lib/python/site-packages',
++        'include': '{installed_base}/include/python{py_version_short}{abiflags}',
++        'platinclude': '{installed_platbase}/include/python{py_version_short}{abiflags}',
+         'scripts': '{base}/bin',
+         'data': '{base}',
+         },
+@@ -42,29 +40,29 @@
+         'data': '{base}',
+         },
+     'nt': {
+-        'stdlib': '{installed_base}/Lib',
+-        'platstdlib': '{base}/Lib',
+-        'purelib': '{base}/Lib/site-packages',
+-        'platlib': '{base}/Lib/site-packages',
+-        'include': '{installed_base}/Include',
+-        'platinclude': '{installed_base}/Include',
+-        'scripts': '{base}/Scripts',
++        'stdlib': '{installed_base}/lib/python',
++        'platstdlib': '{base}/lib/python',
++        'purelib': '{base}/lib/python/site-packages',
++        'platlib': '{base}/lib/python/site-packages',
++        'include': '{installed_base}/include/python{py_version_short}',
++        'platinclude': '{installed_base}/include/python{py_version_short}',
++        'scripts': '{base}/bin',
+         'data': '{base}',
+         },
+     'nt_user': {
+-        'stdlib': '{userbase}/Python{py_version_nodot}',
+-        'platstdlib': '{userbase}/Python{py_version_nodot}',
+-        'purelib': '{userbase}/Python{py_version_nodot}/site-packages',
+-        'platlib': '{userbase}/Python{py_version_nodot}/site-packages',
+-        'include': '{userbase}/Python{py_version_nodot}/Include',
+-        'scripts': '{userbase}/Python{py_version_nodot}/Scripts',
++        'stdlib': '{userbase}/lib/python',
++        'platstdlib': '{userbase}/lib/python',
++        'purelib': '{userbase}/lib/python/site-packages',
++        'platlib': '{userbase}/lib/python/site-packages',
++        'include': '{userbase}/include/python{py_version_short}',
++        'scripts': '{userbase}/bin',
+         'data': '{userbase}',
+         },
+     'posix_user': {
+-        'stdlib': '{userbase}/lib/python{py_version_short}',
+-        'platstdlib': '{userbase}/lib/python{py_version_short}',
+-        'purelib': '{userbase}/lib/python{py_version_short}/site-packages',
+-        'platlib': '{userbase}/lib/python{py_version_short}/site-packages',
++        'stdlib': '{userbase}/lib/python',
++        'platstdlib': '{userbase}/lib/python',
++        'purelib': '{userbase}/lib/python/site-packages',
++        'platlib': '{userbase}/lib/python/site-packages',
+         'include': '{userbase}/include/python{py_version_short}',
+         'scripts': '{userbase}/bin',
+         'data': '{userbase}',
+diff -urN a/Lib/test/test_venv.py b/Lib/test/test_venv.py
+--- a/Lib/test/test_venv.py	2018-10-20 07:24:09.000000000 +0200
++++ b/Lib/test/test_venv.py	2020-07-20 13:56:03.012008577 +0200
+@@ -50,12 +50,12 @@
+     def setUp(self):
+         self.env_dir = os.path.realpath(tempfile.mkdtemp())
+         if os.name == 'nt':
+-            self.bindir = 'Scripts'
+-            self.lib = ('Lib',)
+-            self.include = 'Include'
++            self.bindir = 'bin'
++            self.lib = ('lib', 'python')
++            self.include = 'include'
+         else:
+             self.bindir = 'bin'
+-            self.lib = ('lib', 'python%d.%d' % sys.version_info[:2])
++            self.lib = ('lib', 'python')
+             self.include = 'include'
+         if sys.platform == 'darwin' and '__PYVENV_LAUNCHER__' in os.environ:
+             executable = os.environ['__PYVENV_LAUNCHER__']
+@@ -155,18 +155,19 @@
+ 
+     if sys.platform == 'win32':
+         ENV_SUBDIRS = (
+-            ('Scripts',),
+-            ('Include',),
+-            ('Lib',),
+-            ('Lib', 'site-packages'),
++            ('bin',),
++            ('include',),
++            ('lib',),
++            ('lib', 'python'),
++            ('lib', 'python', 'site-packages'),
+         )
+     else:
+         ENV_SUBDIRS = (
+             ('bin',),
+             ('include',),
+             ('lib',),
+-            ('lib', 'python%d.%d' % sys.version_info[:2]),
+-            ('lib', 'python%d.%d' % sys.version_info[:2], 'site-packages'),
++            ('lib', 'python'),
++            ('lib', 'python', 'site-packages'),
+         )
+ 
+     def create_contents(self, paths, filename):
+diff -urN a/Lib/venv/__init__.py b/Lib/venv/__init__.py
+--- a/Lib/venv/__init__.py	2018-10-20 07:24:09.000000000 +0200
++++ b/Lib/venv/__init__.py	2020-07-20 13:53:55.668368520 +0200
+@@ -114,15 +114,13 @@
+         context.python_dir = dirname
+         context.python_exe = exename
+         if sys.platform == 'win32':
+-            binname = 'Scripts'
+-            incpath = 'Include'
+-            libpath = os.path.join(env_dir, 'Lib', 'site-packages')
++            binname = 'bin'
++            incpath = 'include'
++            libpath = os.path.join(env_dir, 'lib', 'python', 'site-packages')
+         else:
+             binname = 'bin'
+             incpath = 'include'
+-            libpath = os.path.join(env_dir, 'lib',
+-                                   'python%d.%d' % sys.version_info[:2],
+-                                   'site-packages')
++            libpath = os.path.join(env_dir, 'lib', 'python', 'site-packages')
+         context.inc_path = path = os.path.join(env_dir, incpath)
+         create_if_needed(path)
+         create_if_needed(libpath)
+diff -urN a/Modules/getpath.c b/Modules/getpath.c
+--- a/Modules/getpath.c	2018-10-20 07:24:09.000000000 +0200
++++ b/Modules/getpath.c	2020-07-20 12:27:52.940292992 +0200
+@@ -494,7 +494,7 @@
+     _pythonpath = Py_DecodeLocale(PYTHONPATH, NULL);
+     _prefix = Py_DecodeLocale(PREFIX, NULL);
+     _exec_prefix = Py_DecodeLocale(EXEC_PREFIX, NULL);
+-    lib_python = Py_DecodeLocale("lib/python" VERSION, NULL);
++    lib_python = Py_DecodeLocale("lib/python", NULL);
+ 
+     if (!_pythonpath || !_prefix || !_exec_prefix || !lib_python) {
+         Py_FatalError(
+diff -urN a/Modules/main.c b/Modules/main.c
+--- a/Modules/main.c	2018-10-20 07:24:09.000000000 +0200
++++ b/Modules/main.c	2020-07-20 12:27:52.940292992 +0200
+@@ -20,9 +20,9 @@
+ #endif
+ 
+ #if defined(MS_WINDOWS)
+-#define PYTHONHOMEHELP "<prefix>\\python{major}{minor}"
++#define PYTHONHOMEHELP "<prefix>\\lib\\python"
+ #else
+-#define PYTHONHOMEHELP "<prefix>/lib/pythonX.X"
++#define PYTHONHOMEHELP "<prefix>/lib/python"
+ #endif
+ 
+ #include "pygetopt.h"
+diff -urN a/PC/bdist_wininst/install.c b/PC/bdist_wininst/install.c
+--- a/PC/bdist_wininst/install.c	2018-10-20 07:24:09.000000000 +0200
++++ b/PC/bdist_wininst/install.c	2020-07-20 13:58:39.582254612 +0200
+@@ -175,16 +175,16 @@
+     { "PURELIB", "" },
+     { "PLATLIB", "" },
+     { "HEADERS", "" }, /* 'Include/dist_name' part already in archive */
+-    { "SCRIPTS", "Scripts\\" },
++    { "SCRIPTS", "bin\\" },
+     { "DATA", "" },
+     { NULL, NULL },
+ };
+ 
+ SCHEME new_scheme[] = {
+-    { "PURELIB", "Lib\\site-packages\\" },
+-    { "PLATLIB", "Lib\\site-packages\\" },
++    { "PURELIB", "lib\\python\\site-packages\\" },
++    { "PLATLIB", "lib\\python\\site-packages\\" },
+     { "HEADERS", "" }, /* 'Include/dist_name' part already in archive */
+-    { "SCRIPTS", "Scripts\\" },
++    { "SCRIPTS", "bin\\" },
+     { "DATA", "" },
+     { NULL, NULL },
+ };
+@@ -2065,7 +2065,7 @@
+             SetDlgItemText(hwnd, IDC_TITLE,
+                             "Please wait while running postinstall script...");
+             strcpy(fname, python_dir);
+-            strcat(fname, "\\Scripts\\");
++            strcat(fname, "\\bin\\");
+             strcat(fname, install_script);
+ 
+             if (logfile)
