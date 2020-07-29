@@ -1,0 +1,26 @@
+diff -urN a/Python/pylifecycle.c b/Python/pylifecycle.c
+--- a/Python/pylifecycle.c	2018-10-20 07:24:09.000000000 +0200
++++ b/Python/pylifecycle.c	2020-07-31 10:26:01.207776771 +0200
+@@ -31,6 +31,7 @@
+ #ifdef MS_WINDOWS
+ #undef BYTE
+ #include "windows.h"
++#include <shlwapi.h>
+ 
+ extern PyTypeObject PyWindowsConsoleIO_Type;
+ #define PyWindowsConsoleIO_Check(op) (PyObject_TypeCheck((op), &PyWindowsConsoleIO_Type))
+@@ -315,6 +316,14 @@
+     initialized = 1;
+     _Py_Finalizing = NULL;
+ 
++#ifdef MS_WINDOWS
++    wchar_t pydir[MAX_PATH];
++    if(GetModuleFileNameW(NULL, pydir, MAX_PATH) > 0) {
++        PathRemoveFileSpecW(pydir);
++        SetDllDirectoryW(pydir);
++    }
++#endif
++
+ #ifdef HAVE_SETLOCALE
+     /* Set up the LC_CTYPE locale, so we can obtain
+        the locale's charset without having to switch
