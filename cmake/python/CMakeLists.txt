@@ -104,5 +104,5 @@ configure_file(
     COPYONLY
 )
 if(INSTALL_DEVELOPMENT)
-    install(FILES ${SRC_GDB_HOOKS} DESTINATION ${BIN_INSTALL_DIR} COMPONENT Development)
+    install(FILES ${SRC_GDB_HOOKS} DESTINATION ${BIN_INSTALL_DIR} COMPONENT Development RENAME python-gdb.py)
 endif()
