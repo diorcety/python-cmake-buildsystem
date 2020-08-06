@@ -126,7 +126,7 @@ cmake_dependent_option(USE_LIBEDIT "Use libedit instead of readline" OFF
 option(WITH_TSC "profile with the Pentium timestamp counter" OFF)
 option(ENABLE_IPV6 "Enable IP v6" ON)
 option(WITH_DOC_STRINGS "Enable if you want documentation strings in extension modules" ON)
-set(Py_DEBUG OFF) # TODO - Build debugging interpreter
+option(Py_DEBUG "Build debugging interpreter" OFF)
 option(WITH_PYMALLOC "Define if you want to compile in Python-specific mallocs" ON)
 option(WITH_THREAD "Compile in rudimentary thread support" ON)
 if(UNIX)
