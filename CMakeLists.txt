@@ -155,6 +155,9 @@ else()
     set(WITH_STATIC_DEPENDENCIES 0)
 endif()
 
+SET(BUILD_TMP_DIR ${CMAKE_CURRENT_BINARY_DIR}/tmp)
+file(MAKE_DIRECTORY ${BUILD_TMP_DIR})
+
 # Detect source directory
 set(_landmark "pyconfig.h.in") # CMake will look for this file.
 if(NOT (SRC_DIR AND EXISTS ${SRC_DIR}/${_landmark}))
@@ -162,8 +165,8 @@ if(NOT (SRC_DIR AND EXISTS ${SRC_DIR}/${_landmark}))
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/cpython-${PY_VERSION}
         ${CMAKE_CURRENT_SOURCE_DIR}/Python-${PY_VERSION}
-        ${CMAKE_CURRENT_BINARY_DIR}/../cpython-${PY_VERSION}
-        ${CMAKE_CURRENT_BINARY_DIR}/../Python-${PY_VERSION})
+        ${BUILD_TMP_DIR}/cpython-${PY_VERSION}
+        ${BUILD_TMP_DIR}/Python-${PY_VERSION})
         set(SRC_DIR ${dirname})
         if(EXISTS ${SRC_DIR}/${_landmark})
             break()
@@ -212,7 +215,7 @@ set(_extracted_dir "Python-${PY_VERSION}")
 
 if(NOT EXISTS ${SRC_DIR}/${_landmark} AND DOWNLOAD_SOURCES)
     get_filename_component(_filename ${_download_link} NAME)
-    set(_archive_filepath ${CMAKE_CURRENT_BINARY_DIR}/../${_filename})
+    set(_archive_filepath ${BUILD_TMP_DIR}/${_filename})
     if(EXISTS "${_archive_filepath}")
         message(STATUS "${_filename} already downloaded")
     else()
@@ -229,12 +232,12 @@ if(NOT EXISTS ${SRC_DIR}/${_landmark} AND DOWNLOAD_SOURCES)
 
     message(STATUS "Extracting ${_filename}")
     execute_process(COMMAND ${CMAKE_COMMAND} -E tar xfz ${_archive_filepath}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/..
+        WORKING_DIRECTORY ${BUILD_TMP_DIR}
         RESULT_VARIABLE rv)
     if(NOT rv EQUAL 0)
         message(FATAL_ERROR "error: extraction of '${_filename}' failed")
     endif()
-    set(SRC_DIR ${CMAKE_CURRENT_BINARY_DIR}/../${_extracted_dir})
+    set(SRC_DIR ${BUILD_TMP_DIR}/${_extracted_dir})
 endif()
 
 if(NOT EXISTS ${SRC_DIR}/${_landmark})
