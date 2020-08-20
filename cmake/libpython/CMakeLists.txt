@@ -60,6 +60,7 @@ elseif(WIN32)
     set_property(
         SOURCE ${SRC_DIR}/PC/getpathp.c
         PROPERTY COMPILE_DEFINITIONS
+            "PY3_DLLNAME=${_wide_char_modifier}\"python${LIBPYTHON_VERSION}${ABIFLAGS}\""
             "LANDMARK=${_wide_char_modifier}\"${PYTHONHOME_ESCAPED}\\\\os.py\""
             "PYTHONPATH=${_wide_char_modifier}\"${PYTHONPATH}\""
     )
