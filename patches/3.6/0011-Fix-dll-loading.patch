@@ -1,6 +1,7 @@
-diff -urN a/Python/pylifecycle.c b/Python/pylifecycle.c
---- a/Python/pylifecycle.c	2018-10-20 07:24:09.000000000 +0200
-+++ b/Python/pylifecycle.c	2020-07-31 10:26:01.207776771 +0200
+diff --git a/Python/pylifecycle.c b/Python/pylifecycle.c
+index 0ebf9c7029..2244d697f0 100644
+--- a/Python/pylifecycle.c
++++ b/Python/pylifecycle.c
 @@ -31,6 +31,7 @@
  #ifdef MS_WINDOWS
  #undef BYTE
@@ -9,7 +10,7 @@ diff -urN a/Python/pylifecycle.c b/Python/pylifecycle.c
  
  extern PyTypeObject PyWindowsConsoleIO_Type;
  #define PyWindowsConsoleIO_Check(op) (PyObject_TypeCheck((op), &PyWindowsConsoleIO_Type))
-@@ -315,6 +316,14 @@
+@@ -315,6 +316,19 @@ _Py_InitializeEx_Private(int install_sigs, int install_importlib)
      initialized = 1;
      _Py_Finalizing = NULL;
  
@@ -17,7 +18,12 @@ diff -urN a/Python/pylifecycle.c b/Python/pylifecycle.c
 +    wchar_t pydir[MAX_PATH];
 +    if(GetModuleFileNameW(NULL, pydir, MAX_PATH) > 0) {
 +        PathRemoveFileSpecW(pydir);
-+        SetDllDirectoryW(pydir);
++        HMODULE aKern32Module = GetModuleHandleW (L"KERNEL32");
++        typedef BOOL (WINAPI *SetDllDirectoryW_t)(const wchar_t* thePathName);
++        SetDllDirectoryW_t aFunc = (aKern32Module != NULL)? (SetDllDirectoryW_t)GetProcAddress(aKern32Module, "SetDllDirectoryW") : NULL;
++        if (aFunc != NULL) {
++            aFunc(pydir);
++        }
 +    }
 +#endif
 +

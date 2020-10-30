@@ -1,0 +1,150 @@
+diff --git a/Modules/posixmodule.c b/Modules/posixmodule.c
+index 776a3d249a..acffddae90 100644
+--- a/Modules/posixmodule.c
++++ b/Modules/posixmodule.c
+@@ -1504,6 +1504,32 @@ attributes_from_dir(LPCWSTR pszFile, BY_HANDLE_FILE_INFORMATION *info, ULONG *re
+     return TRUE;
+ }
+ 
++
++/* Grab GetFinalPathNameByHandle dynamically from kernel32 */
++static int has_GetFinalPathNameByHandle = -1;
++static DWORD (CALLBACK *Py_GetFinalPathNameByHandleW)(HANDLE, LPWSTR, DWORD,
++                                                      DWORD);
++static int
++check_GetFinalPathNameByHandle()
++{
++    HINSTANCE hKernel32;
++    DWORD (CALLBACK *Py_GetFinalPathNameByHandleA)(HANDLE, LPSTR, DWORD,
++                                                   DWORD);
++
++    /* only recheck */
++    if (-1 == has_GetFinalPathNameByHandle)
++    {
++        hKernel32 = GetModuleHandleW(L"KERNEL32");
++        *(FARPROC*)&Py_GetFinalPathNameByHandleA = GetProcAddress(hKernel32,
++                                                "GetFinalPathNameByHandleA");
++        *(FARPROC*)&Py_GetFinalPathNameByHandleW = GetProcAddress(hKernel32,
++                                                "GetFinalPathNameByHandleW");
++        has_GetFinalPathNameByHandle = Py_GetFinalPathNameByHandleA &&
++                                       Py_GetFinalPathNameByHandleW;
++    }
++    return has_GetFinalPathNameByHandle;
++}
++
+ static BOOL
+ get_target_path(HANDLE hdl, wchar_t **target_path)
+ {
+@@ -1512,7 +1538,7 @@ get_target_path(HANDLE hdl, wchar_t **target_path)
+ 
+     /* We have a good handle to the target, use it to determine
+        the target path name (then we'll call lstat on it). */
+-    buf_size = GetFinalPathNameByHandleW(hdl, 0, 0,
++    buf_size = Py_GetFinalPathNameByHandleW(hdl, 0, 0,
+                                          VOLUME_NAME_DOS);
+     if(!buf_size)
+         return FALSE;
+@@ -1523,7 +1549,7 @@ get_target_path(HANDLE hdl, wchar_t **target_path)
+         return FALSE;
+     }
+ 
+-    result_length = GetFinalPathNameByHandleW(hdl,
++    result_length = Py_GetFinalPathNameByHandleW(hdl,
+                        buf, buf_size, VOLUME_NAME_DOS);
+ 
+     if(!result_length) {
+@@ -1553,6 +1579,12 @@ win32_xstat_impl(const wchar_t *path, struct _Py_stat_struct *result,
+     wchar_t *target_path;
+     const wchar_t *dot;
+ 
++    if(!check_GetFinalPathNameByHandle()) {
++        /* If the OS doesn't have GetFinalPathNameByHandle, don't
++           traverse reparse point. */
++        traverse = FALSE;
++    }
++
+     hFile = CreateFileW(
+         path,
+         FILE_READ_ATTRIBUTES, /* desired access */
+@@ -3688,6 +3720,13 @@ os__getfinalpathname_impl(PyObject *module, PyObject *path)
+     if (path_wchar == NULL)
+         return NULL;
+ 
++    if(!check_GetFinalPathNameByHandle()) {
++        /* If the OS doesn't have GetFinalPathNameByHandle, return a
++           NotImplementedError. */
++        return PyErr_Format(PyExc_NotImplementedError,
++            "GetFinalPathNameByHandle not available on this platform");
++    }
++
+     Py_BEGIN_ALLOW_THREADS
+     hFile = CreateFileW(
+         path_wchar,
+@@ -3707,7 +3746,7 @@ os__getfinalpathname_impl(PyObject *module, PyObject *path)
+        target path name. */
+     while (1) {
+         Py_BEGIN_ALLOW_THREADS
+-        result_length = GetFinalPathNameByHandleW(hFile, target_path,
++        result_length = Py_GetFinalPathNameByHandleW(hFile, target_path,
+                                                   buf_size, VOLUME_NAME_DOS);
+         Py_END_ALLOW_THREADS
+ 
+diff --git a/Python/pytime.c b/Python/pytime.c
+index 19fdb55b06..e842d56b25 100644
+--- a/Python/pytime.c
++++ b/Python/pytime.c
+@@ -570,7 +570,7 @@ pygettimeofday(_PyTime_t *tp, _Py_clock_info_t *info, int raise)
+     /* 11,644,473,600,000,000,000: number of nanoseconds between
+        the 1st january 1601 and the 1st january 1970 (369 years + 89 leap
+        days). */
+-    *tp = large.QuadPart * 100 - 11644473600000000000;
++    *tp = large.QuadPart * 100 - 11644473600000000000ULL;
+     if (info) {
+         DWORD timeAdjustment, timeIncrement;
+         BOOL isTimeAdjustmentDisabled, ok;
+@@ -664,6 +664,36 @@ _PyTime_GetSystemClockWithInfo(_PyTime_t *t, _Py_clock_info_t *info)
+     return pygettimeofday(t, info, 1);
+ }
+ 
++#if defined(MS_WINDOWS)
++/* GetTickCount64() is not available on XP. */
++static ULONGLONG
++Py_GetTickCount64()
++{
++    static ULONGLONG (CALLBACK *Py_GetTickCount64)() = (ULONGLONG (CALLBACK *)(void))-1;
++    static DWORD last_ticks = 0;
++    static DWORD n_overflow = 0;
++    DWORD ticks = 0;
++    HINSTANCE hKernel32;
++
++    if (Py_GetTickCount64 == (void*)-1)
++    {
++        hKernel32 = GetModuleHandleW(L"KERNEL32");
++        Py_GetTickCount64 = *(ULONGLONG (CALLBACK *)(void))(GetProcAddress(hKernel32,
++                                        "GetTickCount64"));
++    }
++    if (Py_GetTickCount64 != (void*) NULL)
++    {
++        return Py_GetTickCount64();
++    }
++
++    ticks = GetTickCount();
++    if (ticks < last_ticks)
++        n_overflow++;
++    last_ticks = ticks;
++    return ((ULONGLONG)n_overflow << 32LL) + (ULONGLONG)GetTickCount();
++}
++#endif
++
+ static int
+ pymonotonic(_PyTime_t *tp, _Py_clock_info_t *info, int raise)
+ {
+@@ -673,7 +703,7 @@ pymonotonic(_PyTime_t *tp, _Py_clock_info_t *info, int raise)
+ 
+     assert(info == NULL || raise);
+ 
+-    ticks = GetTickCount64();
++    ticks = Py_GetTickCount64();
+     Py_BUILD_ASSERT(sizeof(ticks) <= sizeof(_PyTime_t));
+     t = (_PyTime_t)ticks;
+ 
