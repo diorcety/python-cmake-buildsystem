@@ -1,0 +1,15 @@
+diff --git a/Modules/_ctypes/libffi_msvc/win32.c b/Modules/_ctypes/libffi_msvc/win32.c
+index f44a5fe369..61cc4865b7 100644
+--- a/Modules/_ctypes/libffi_msvc/win32.c
++++ b/Modules/_ctypes/libffi_msvc/win32.c
+@@ -72,8 +72,8 @@ ffi_call_x86(void (* prepfunc)(char *, extended_cif *), /* 8 */
+ 
+ // Load ecif->cif->abi
+ 		mov ecx, [ebp + 12]
+-		mov ecx, [ecx]ecif.cif
+-		mov ecx, [ecx]ecif.cif.abi
++		mov ecx, [ecx]
++		mov ecx, [ecx]
+ 		
+ 		cmp ecx, FFI_STDCALL
+ 		je noclean
